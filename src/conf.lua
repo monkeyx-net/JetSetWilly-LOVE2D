@@ -1,8 +1,8 @@
 function love.conf(t)
     t.version       = "11.5"
     t.console       = false
-
     t.window.title          = "Jet-Set Willy"
+    t.identity = t.window.title:gsub(" ", "")
     t.window.width          = 768   -- 256 * 3
     t.window.height         = 576   -- 192 * 3
     t.window.resizable      = true
