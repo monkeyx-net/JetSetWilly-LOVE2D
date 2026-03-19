@@ -21,7 +21,7 @@ gameInput  = nil     -- Love2D key name string set during keypressed, then clear
 videoFlash = false   -- toggled at ~3.125 Hz
 audioPanX  = 0       -- 0-255 x-position for audio panning
 
-BUILD = "love2d"
+BUILD = "love2d - v0.11"
 
 -- System abstraction layer (called by game modules)
 function System_IsKey(key)

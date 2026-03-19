@@ -290,6 +290,139 @@ function Game_CheatEnabled()
     Robots_DrawCheat()
 end
 
+-- ── Save state ────────────────────────────────────────────────────────────────
+
+local SAVE_FILE        = "savestate.lua"
+local saveStateSnapshot = nil
+
+-- ── Serialization helpers ────────────────────────────────────────────────────
+
+local function serWilly(w)
+    return string.format("{x=%d,y=%d,tile=%d,align=%d,frame=%d,dir=%d,move=%d,air=%d,jump=%d}",
+        w.x, w.y, w.tile, w.align, w.frame, w.dir, w.move, w.air, w.jump)
+end
+
+local function serRobot(r)
+    return string.format("{pos=%d,min=%d,max=%d,speed=%d,fUpdate=%d,fIndex=%d,fMask=%d,ink=%d,moveName=%q,drawName=%q}",
+        r.pos, r.min, r.max, r.speed, r.fUpdate, r.fIndex, r.fMask, r.ink,
+        Robots_GetMoveName(r.DoMove), Robots_GetDrawName(r.DoDraw))
+end
+
+local function serItems(items)
+    local rows = {}
+    for li = 1, 60 do
+        local row = items[li] or {}
+        local vals = {}
+        for _, v in ipairs(row) do vals[#vals+1] = tostring(v) end
+        rows[li] = "{"..table.concat(vals, ",").."}"
+    end
+    return "{"..table.concat(rows, ",").."}"
+end
+
+local function serializeState(s)
+    local robots = {}
+    for i = 1, 8 do robots[i] = serRobot(s.robots[i]) end
+    return string.format(
+        "return{level=%d,lives=%d,scoreItems=%d,clock={%d,%d,%d},clockTicks=%d,mode=%d,itemCount=%d,willy=%s,robots={%s},items=%s}",
+        s.level, s.lives, s.scoreItems,
+        s.clock[1], s.clock[2], s.clock[3],
+        s.clockTicks, s.mode, s.itemCount,
+        serWilly(s.willy),
+        table.concat(robots, ","),
+        serItems(s.items))
+end
+
+local function deserializeState(str)
+    local fn, err = load(str)
+    if not fn then return nil end
+    local ok, s = pcall(fn)
+    if not ok or type(s) ~= "table" then return nil end
+    for i = 1, 8 do
+        local r    = s.robots[i]
+        r.DoMove = Robots_GetMoveFunc(r.moveName)
+        r.DoDraw = Robots_GetDrawFunc(r.drawName)
+    end
+    return s
+end
+
+-- ── Core save/load ───────────────────────────────────────────────────────────
+
+local function applyState(s)
+    Level_LoadItems(s.items)
+
+    gameLevel      = s.level
+    gameLives      = s.lives
+    gameScoreItems = s.scoreItems
+    gameScoreClock[1] = s.clock[1]
+    gameScoreClock[2] = s.clock[2]
+    gameScoreClock[3] = s.clock[3]
+    gameClockTicks = s.clockTicks
+    gameMode       = s.mode
+    itemCount      = s.itemCount
+
+    Level_Init()
+    Robots_Init()
+    Rope_Init()
+    System_Border(levelBorder[gameLevel + 1])
+
+    Robots_LoadPositions(s.robots)
+
+    for k, v in pairs(s.willy) do minerWilly[k] = v end
+    Miner_Save()
+
+    minerAttrSplit = 6
+    if gameLevel == SWIMMINGPOOL then minerAttrSplit = 5 end
+
+    Audio_ResetTempo()
+    Timer_Set(gameTimer, 12, TICKRATE)
+    gameFrame           = 1
+    gameInactivityTimer = 0
+    minerWillyRope      = 0
+    DoClockUpdate       = DoDrawClock
+
+    Game_DrawStatus()
+
+    if gamePaused ~= 0 then
+        Ticker = DoNothing
+        Drawer = DoDrawOnce
+    else
+        Ticker = DoGameTicker
+        Drawer = DoGameDrawer
+    end
+end
+
+local function Game_SaveState()
+    local w = {}
+    for k, v in pairs(minerWilly) do w[k] = v end
+
+    saveStateSnapshot = {
+        willy      = w,
+        robots     = Robots_SaveState(),
+        items      = Level_SaveItems(),
+        level      = gameLevel,
+        lives      = gameLives,
+        scoreItems = gameScoreItems,
+        clock      = {gameScoreClock[1], gameScoreClock[2], gameScoreClock[3]},
+        clockTicks = gameClockTicks,
+        mode       = gameMode,
+        itemCount  = itemCount,
+    }
+
+    local ok, err = love.filesystem.write(SAVE_FILE, serializeState(saveStateSnapshot))
+    if not ok then
+        print("SaveState: write failed: " .. tostring(err))
+    end
+end
+
+local function Game_LoadState()
+    -- Try file first; fall back to in-memory snapshot
+    local str = love.filesystem.read(SAVE_FILE)
+    local s = str and deserializeState(str) or saveStateSnapshot
+    if not s then return end
+    saveStateSnapshot = s  -- keep in sync
+    applyState(s)
+end
+
 -- ── Responder ─────────────────────────────────────────────────────────────────
 
 local function DoGameResponder()
@@ -303,6 +436,10 @@ local function DoGameResponder()
         Game_Pause(0)
     elseif gameInput == KEY_ESCAPE then
         Action = Title_Action
+    elseif gameInput == KEY_S then
+        Game_SaveState()
+    elseif gameInput == KEY_L then
+        Game_LoadState()
     else
         Cheat_Responder()
     end

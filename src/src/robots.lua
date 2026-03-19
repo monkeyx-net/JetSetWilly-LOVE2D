@@ -633,3 +633,81 @@ function Robots_Init()
         robotThis[2].DoDraw = DoNothing
     end
 end
+
+-- ── Function name registry (for file serialization) ─────────────────────────
+
+local moveFnByName, moveFnToName = {}, {}
+local drawFnByName, drawFnToName = {}, {}
+do
+    local function rm(fn, n) moveFnByName[n] = fn; moveFnToName[fn] = n end
+    local function rd(fn, n) drawFnByName[n] = fn; drawFnToName[fn] = n end
+    rm(DoMoveLeft,       "L");  rm(DoMoveRight,      "R")
+    rm(DoMoveUp,         "U");  rm(DoMoveDown,        "D")
+    rm(DoMoveStatic,     "S");  rm(DoMoveArrowLeft,   "AL")
+    rm(DoMoveArrowRight, "AR"); rm(DoMoveMaria,       "M")
+    rm(DoNothing,        "N")
+    rd(DoDrawRobot, "R"); rd(DoDrawArrow, "A")
+    rd(DoDrawToilet,"T"); rd(DoNothing,   "N")
+end
+
+function Robots_GetMoveName(fn) return moveFnToName[fn] or "N"       end
+function Robots_GetDrawName(fn) return drawFnToName[fn] or "N"       end
+function Robots_GetMoveFunc(n)  return moveFnByName[n]  or DoNothing end
+function Robots_GetDrawFunc(n)  return drawFnByName[n]  or DoNothing end
+
+-- Apply only runtime-mutable state. Call after Robots_Init() so that
+-- gfx/ink/speed/fMask are already correct from the start definitions.
+function Robots_LoadPositions(state)
+    for i = 1, 8 do
+        local s = state[i]
+        local r = robotThis[i]
+        r.pos     = s.pos
+        r.min     = s.min
+        r.max     = s.max
+        r.fUpdate = s.fUpdate
+        r.fIndex  = s.fIndex
+        -- DoMove/DoDraw: function ref (in-memory path) or name lookup (file path)
+        r.DoMove  = s.DoMove or Robots_GetMoveFunc(s.moveName)
+        r.DoDraw  = s.DoDraw or Robots_GetDrawFunc(s.drawName)
+    end
+end
+
+function Robots_SaveState()
+    local state = {}
+    for i = 1, 8 do
+        local r = robotThis[i]
+        state[i] = {
+            pos     = r.pos,
+            min     = r.min,
+            max     = r.max,
+            DoMove  = r.DoMove,
+            DoDraw  = r.DoDraw,
+            speed   = r.speed,
+            gfx     = r.gfx,
+            ink     = r.ink,
+            fUpdate = r.fUpdate,
+            fIndex  = r.fIndex,
+            fMask   = r.fMask,
+        }
+    end
+    return state
+end
+
+function Robots_LoadState(state)
+    for i = 1, 8 do
+        local s = state[i]
+        robotThis[i] = {
+            pos     = s.pos,
+            min     = s.min,
+            max     = s.max,
+            DoMove  = s.DoMove,
+            DoDraw  = s.DoDraw,
+            speed   = s.speed,
+            gfx     = s.gfx,
+            ink     = s.ink,
+            fUpdate = s.fUpdate,
+            fIndex  = s.fIndex,
+            fMask   = s.fMask,
+        }
+    end
+end

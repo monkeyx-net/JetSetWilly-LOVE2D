@@ -56,7 +56,7 @@ local function DoLoaderDrawer1()
     Video_PixelPaperFill(0, WIDTH * HEIGHT, 0x1)
 
     -- Version line
-    Video_Write(23 * 8 * WIDTH, "\x01\x01\x02\x07fawtytoo")
+    Video_Write(23 * 8 * WIDTH, "\x01\x01\x02\x07monkeyx-net")
     Video_Write(23 * 8 * WIDTH + WIDTH - Video_TextWidth(BUILD or ""), "\x02\x00" .. (BUILD or ""))
 
     Audio_Music(MUS_LOADER, MUS_PLAY)

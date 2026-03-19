@@ -2664,6 +2664,29 @@ function Level_Dir(dir)
     return curLevel.map[dir] or 0
 end
 
+function Level_SaveItems()
+    local copy = {}
+    for li = 1, 60 do
+        if itemsByLevel[li] then
+            local row = {}
+            for j, v in ipairs(itemsByLevel[li]) do row[j] = v end
+            copy[li] = row
+        else
+            copy[li] = {}
+        end
+    end
+    return copy
+end
+
+function Level_LoadItems(saved)
+    for li = 1, 60 do
+        local src = saved[li] or {}
+        local row = {}
+        for j, v in ipairs(src) do row[j] = v end
+        itemsByLevel[li] = row
+    end
+end
+
 function Level_SetBorder()
     local colours = {5,4,6,2,3,1,2,1,4,2,2,4,6,5,1,3,2,1,2,1,
                      2,1,4,4,1,1,5,2,3,2,2,2,2,2,1,1,5,6,2,2,
